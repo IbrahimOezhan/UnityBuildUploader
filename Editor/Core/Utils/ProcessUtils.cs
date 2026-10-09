@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Debug = UnityEngine.Debug;
 
@@ -11,6 +12,14 @@ namespace Wireframe
 {
     public static class ProcessUtils
     {
+        // SteamCMD on Linux colours its output even when it is piped, e.g. "\e[0mLogging in user ...".
+        private static readonly Regex AnsiEscapeCodes = new Regex(@"\x1B\[[0-9;?]*[A-Za-z]");
+
+        private static string StripAnsiCodes(string text)
+        {
+            return string.IsNullOrEmpty(text) ? text : AnsiEscapeCodes.Replace(text, "");
+        }
+
         /// <summary>Opens an interactive terminal. Arguments are individual values, not shell code.</summary>
         public static void ShowConsole(string path, params string[] arguments)
         {
@@ -206,8 +215,8 @@ namespace Wireframe
                     Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
                     Task<string> errorTask = process.StandardError.ReadToEndAsync();
                     await Task.WhenAll(outputTask, errorTask);
-                    string output = outputTask.Result.HideText(hideText);
-                    string errors = errorTask.Result.HideText(hideText);
+                    string output = StripAnsiCodes(outputTask.Result).HideText(hideText);
+                    string errors = StripAnsiCodes(errorTask.Result).HideText(hideText);
                 
                     process.WaitForExit();
                     
@@ -308,8 +317,8 @@ namespace Wireframe
 
                     string output;
                     string errors;
-                    lock (outputBuilder) output = outputBuilder.ToString();
-                    lock (errorBuilder) errors = errorBuilder.ToString();
+                    lock (outputBuilder) output = StripAnsiCodes(outputBuilder.ToString());
+                    lock (errorBuilder) errors = StripAnsiCodes(errorBuilder.ToString());
 
                     if (process.ExitCode != 0)
                     {
