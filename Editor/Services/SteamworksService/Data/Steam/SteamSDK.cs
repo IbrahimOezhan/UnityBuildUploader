@@ -75,6 +75,24 @@ namespace Wireframe
 			get => Instance.m_scriptPath;
 		}
 
+		/// <summary>
+		/// On Linux SteamCMD keeps its login wherever ~/.steam/steam points. With the Steam client installed that
+		/// is the client's folder, and the client overwrites the saved login. A HOME without that link makes
+		/// SteamCMD keep its own Steam folder inside it, next to steamcmd.sh. Null on other platforms.
+		/// </summary>
+		private static Dictionary<string, string> GetSteamCMDEnvironment()
+		{
+			string exePath = SteamSDKEXEPath;
+			if (Application.platform != RuntimePlatform.LinuxEditor || string.IsNullOrEmpty(exePath))
+			{
+				return null;
+			}
+
+			string home = Path.Combine(Path.GetDirectoryName(exePath) ?? string.Empty, "home");
+			Directory.CreateDirectory(home);
+			return new Dictionary<string, string> { { "HOME", home } };
+		}
+
 		public bool IsInitialized => m_initialized;
 
 		private static SteamSDK m_instance;
@@ -290,7 +308,7 @@ namespace Wireframe
 					stepResult.AddLog("[Steam] Uploading to Steam...");
 					Stopwatch stopwatch = Stopwatch.StartNew();
 					string args = CreateUploadBuildSteamArguments(appFilePath, true);
-					var result = await ProcessUtils.RunTask(stepResult, m_steamCMDPath, args, null, UserName);
+					var result = await ProcessUtils.RunTask(stepResult, m_steamCMDPath, args, GetSteamCMDEnvironment(), UserName);
 					stopwatch.Stop();
 					stepResult.AddLog($"[Steam] Steam upload took {stopwatch.ElapsedMilliseconds}ms");
 					if (!result.IsSuccessful)
@@ -500,13 +518,28 @@ namespace Wireframe
 
 		public void Authenticate()
 		{
-			string[] arguments = new[] { "+login", UserName };
-			ProcessUtils.ShowConsole(m_steamCMDPath, arguments);
+			ShowSteamCMDConsole("+login", UserName);
 		}
 
 		public void ShowConsole()
 		{
-			ProcessUtils.ShowConsole(m_steamCMDPath, new string[0]);
+			ShowSteamCMDConsole();
+		}
+
+		private void ShowSteamCMDConsole(params string[] arguments)
+		{
+			Dictionary<string, string> environment = GetSteamCMDEnvironment();
+			if (environment == null)
+			{
+				ProcessUtils.ShowConsole(m_steamCMDPath, arguments);
+				return;
+			}
+
+			// The console can't be given environment variables, so let env set HOME for SteamCMD alone.
+			// The login has to land in the same HOME the uploads use.
+			List<string> envArguments = new List<string> { "HOME=" + environment["HOME"], m_steamCMDPath };
+			envArguments.AddRange(arguments);
+			ProcessUtils.ShowConsole("/usr/bin/env", envArguments.ToArray());
 		}
 		
 		/// <summary>
@@ -532,7 +565,7 @@ namespace Wireframe
 					stepResult.AddLog("[Steam] DRM'ing on Steam...");
 					Stopwatch stopwatch = Stopwatch.StartNew();
 					string args = CreateDRMWrapSteamArguments(true, steamGuardCode, appID, sourceExe, resultEXE, flags);
-					var result = await ProcessUtils.RunTask(stepResult, m_steamCMDPath, args, null, UserName);
+					var result = await ProcessUtils.RunTask(stepResult, m_steamCMDPath, args, GetSteamCMDEnvironment(), UserName);
 					stopwatch.Stop();
 					stepResult.AddLog($"[Steam] Steam DRM took {stopwatch.ElapsedMilliseconds}ms");
 
