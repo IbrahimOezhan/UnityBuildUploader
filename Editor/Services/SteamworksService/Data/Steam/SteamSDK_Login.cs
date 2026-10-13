@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -156,11 +157,12 @@ namespace Wireframe
 			// SteamCMD fails if more than one instance runs at once, so share the upload lock.
 			await m_lock.WaitAsync();
 
+			Dictionary<string, string> environment = GetSteamCMDEnvironment();
 			ProcessUtils.ProcessResult result;
 			try
 			{
 				result = await Task.Run(() => ProcessUtils.RunSync(exePath, arguments, workingDirectory,
-					ProbeTimeoutMs, null, true));
+					ProbeTimeoutMs, environment, true));
 			}
 			finally
 			{
