@@ -244,6 +244,13 @@ namespace Wireframe
 				return localConfig;
 			}
 
+			// On Linux SteamCMD runs with its own HOME and keeps its Steam folder in there.
+			Dictionary<string, string> environment = GetSteamCMDEnvironment();
+			if (environment != null)
+			{
+				return Path.Combine(environment["HOME"], "Steam", "config");
+			}
+
 			string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 			if (string.IsNullOrEmpty(home))
 			{
