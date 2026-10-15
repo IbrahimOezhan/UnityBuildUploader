@@ -26,6 +26,8 @@ namespace Wireframe
         {
             // SteamCMD is the only thing that can authorize the machine, and it has to be interactive -
             // the user has to type their password and answer Steam Guard themselves.
+            // The old "requires login" result is cleared, or the button would only ever open this console again.
+            SteamSDK.InvalidateLoginStatus();
             SteamSDK.Instance.Authenticate();
         }
     }
